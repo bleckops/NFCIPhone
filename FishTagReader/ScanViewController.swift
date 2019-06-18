@@ -63,14 +63,11 @@ class ScanViewController: UITableViewController, NFCTagReaderSessionDelegate {
         }
         
         let dateFormatter = DateFormatter()
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.dateFormat = "yyyyMMdd"
-        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
         
         let outputDateFormatter = DateFormatter()
         outputDateFormatter.dateStyle = .medium
         outputDateFormatter.timeStyle = .none
-        outputDateFormatter.locale = Locale.current
         
         return outputDateFormatter.string(from: dateFormatter.date(from: dateString)!)
     }
@@ -185,7 +182,9 @@ class ScanViewController: UITableViewController, NFCTagReaderSessionDelegate {
                     }
                     
                     if self.updateWithNDEFMessage(message!) {
+                        session.alertMessage = "Tag read success."
                         session.invalidate()
+                        return
                     }
                     
                     session.invalidate(errorMessage: "Tag not valid.")

@@ -47,9 +47,7 @@ class MainViewController: UITableViewController, UINavigationControllerDelegate,
         
         DispatchQueue.main.sync {
             let dateFormatter = DateFormatter()
-            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
             dateFormatter.dateFormat = "yyyyMMdd"
-            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
             dateString = dateFormatter.string(from: self.productDate.date)
             
             kindString = fishKinds[productKind.selectedRow(inComponent: 0)]

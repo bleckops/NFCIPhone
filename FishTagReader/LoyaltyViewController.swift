@@ -81,6 +81,7 @@ class LoyaltyViewController: UITableViewController, NFCTagReaderSessionDelegate 
                 } else if length < blockSize - headerLength {
                     let code = String(bytes: responseBlock4[headerLength ... headerLength + length], encoding: .ascii)
                     self.updateWithCouponCode(code!)
+                    self.readerSession?.alertMessage = "Valid coupon found."
                     self.readerSession?.invalidate()
                 } else {
                     var buffer = responseBlock4[headerLength ... headerLength + length]
@@ -95,6 +96,7 @@ class LoyaltyViewController: UITableViewController, NFCTagReaderSessionDelegate 
                         buffer += responseBlock8[0 ... remain]
                         let code = String(bytes: buffer, encoding: .ascii)
                         self.updateWithCouponCode(code!)
+                        self.readerSession?.alertMessage = "Valid coupon found."
                         self.readerSession?.invalidate()
                     }
                 }
