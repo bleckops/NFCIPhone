@@ -87,7 +87,10 @@ class MainViewController: UITableViewController, UINavigationControllerDelegate,
     
     // MARK: - NFCNDEFReaderSessionDelegate
     func readerSessionDidBecomeActive(_ session: NFCNDEFReaderSession) {
-        let textPayload = NFCNDEFPayload.wellKnowTypeTextPayload(string: "Brought to you by the Great Fish Company", locale: Locale(identifier: "En"))
+        let textPayload = NFCNDEFPayload.wellKnownTypeTextPayload(
+            string: "Brought to you by the Great Fish Company",
+            locale: Locale(identifier: "En")
+        )
         let urlPayload = self.createURLPayload()
         ndefMessage = NFCNDEFMessage(records: [urlPayload!, textPayload!])
         os_log("MessageSize=%d", ndefMessage!.length)
