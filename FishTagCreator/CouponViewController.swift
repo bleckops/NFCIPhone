@@ -40,35 +40,57 @@ class CouponViewController: UITableViewController, NFCTagReaderSessionDelegate {
     
     // MARK: - Private helper functions
     func write(_ data: Data, to tag: NFCMiFareTag, offset: UInt8) {
-        // T2T Write command to write a 4 bytes block at specific block offset
+        // These properties prepare a T2T write command to write a 4 byte block at a specific block offset.
         let writeBlockCommand: UInt8 = 0xA2
         let successCode: UInt8 = 0x0A
         let blockSize = 4
         var blockData: Data = data.prefix(blockSize)
         
-        // You need to zero-padded the data to the block size
+        // You need to zero-pad the data to fill the block size.
         if blockData.count < blockSize {
             blockData += Data(count: blockSize - blockData.count)
         }
         
         let writeCommand = Data([writeBlockCommand, offset]) + blockData
-        
-        tag.sendMiFareCommand(commandPacket: writeCommand) { (response: Data, error: Error?) in
-            if error != nil {
-                self.readerSession?.invalidate(errorMessage: "Write tag error. Please try again.")
-                return
+        if #available(iOS 14.0, *) {
+            tag.sendMiFareCommand(commandPacket: writeCommand) { (result: Result<Data, Error>) in
+                switch result {
+                case .success(let response):
+                    if response[0] != successCode {
+                        self.readerSession?.invalidate(errorMessage: "Write tag error. Please try again.")
+                        return
+                    }
+                    
+                    let newSize = data.count - blockSize
+                    if newSize > 0 {
+                        self.write(data.suffix(newSize), to: tag, offset: (offset + 1))
+                    } else {
+                        self.readerSession?.alertMessage = "Coupon is written."
+                        self.readerSession?.invalidate()
+                    }
+                case .failure(let error):
+                    self.readerSession?.invalidate(errorMessage: "Write tag error: \(error.localizedDescription). Please try again.")
+                }
             }
-            
-            if response[0] != successCode {
-                self.readerSession?.invalidate(errorMessage: "Write tag error. Please try again.")
-                return
-            }
-            
-            let newSize = data.count - blockSize
-            if newSize > 0 {
-                self.write(data.suffix(newSize), to: tag, offset: (offset + 1))
-            } else {
-                self.readerSession?.invalidate()
+        } else {
+            tag.sendMiFareCommand(commandPacket: writeCommand) { (response: Data, error: Error?) in
+                if error != nil {
+                    self.readerSession?.invalidate(errorMessage: "Write tag error. Please try again.")
+                    return
+                }
+                
+                if response[0] != successCode {
+                    self.readerSession?.invalidate(errorMessage: "Write tag error. Please try again.")
+                    return
+                }
+                
+                let newSize = data.count - blockSize
+                if newSize > 0 {
+                    self.write(data.suffix(newSize), to: tag, offset: (offset + 1))
+                } else {
+                    self.readerSession?.alertMessage = "Coupon is written."
+                    self.readerSession?.invalidate()
+                }
             }
         }
     }

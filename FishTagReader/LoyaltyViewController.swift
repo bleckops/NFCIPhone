@@ -39,6 +39,28 @@ class LoyaltyViewController: UITableViewController, NFCTagReaderSessionDelegate 
     }
     
     // MARK: - Private helper functions
+    func sendReadTagCommand(_ data: Data, to tag: NFCMiFareTag, _ completionHandler: @escaping (Data) -> Void) {
+        if #available(iOS 14, *) {
+            tag.sendMiFareCommand(commandPacket: data) { (result: Result<Data, Error>) in
+                switch result {
+                case .success(let response):
+                    completionHandler(response)
+                case .failure(let error):
+                    self.readerSession?.invalidate(errorMessage: "Read tag error: \(error.localizedDescription). Please try again.")
+                }
+            }
+        } else {
+            tag.sendMiFareCommand(commandPacket: data) { (response: Data, optionalError: Error?) in
+                guard let error = optionalError else {
+                    completionHandler(response)
+                    return
+                }
+                
+                self.readerSession?.invalidate(errorMessage: "Read tag error: \(error.localizedDescription). Please try again.")
+            }
+        }
+    }
+    
     func readCouponCode(from tag: NFCTag) {
         guard case let .miFare(mifareTag) = tag else {
             return
@@ -61,12 +83,7 @@ class LoyaltyViewController: UITableViewController, NFCTagReaderSessionDelegate 
             let headerLength = 4
             let maxCodeLength = 16
             
-            mifareTag.sendMiFareCommand(commandPacket: Data(readBlock4)) { (responseBlock4: Data, error: Error?) in
-                if error != nil {
-                    self.readerSession?.invalidate(errorMessage: "Read tag error. Please try again.")
-                    return
-                }
-                
+            self.sendReadTagCommand(Data(readBlock4), to: mifareTag) { (responseBlock4: Data) in
                 // Validate magic signature and use counter
                 if !responseBlock4[0...1].elementsEqual(magicSignature) || responseBlock4[useCounterOffset] < 1 {
                     self.readerSession?.invalidate(errorMessage: "No valid coupon found.")
@@ -88,11 +105,7 @@ class LoyaltyViewController: UITableViewController, NFCTagReaderSessionDelegate 
                     let remain = length - buffer.count
                     let readBlock8: [UInt8] = [0x30, 0x08]
                     
-                    mifareTag.sendMiFareCommand(commandPacket: Data(readBlock8)) { (responseBlock8: Data, error: Error?) in
-                        if error != nil {
-                            self.readerSession?.invalidate(errorMessage: "Read tag error. Please try again.")
-                            return
-                        }
+                    self.sendReadTagCommand(Data(readBlock8), to: mifareTag) { (responseBlock8: Data) in
                         buffer += responseBlock8[0 ... remain]
                         let code = String(bytes: buffer, encoding: .ascii)
                         self.updateWithCouponCode(code!)
