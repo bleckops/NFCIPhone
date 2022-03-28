@@ -164,8 +164,8 @@ class CouponViewController: UITableViewController, NFCTagReaderSessionDelegate {
             return
         }
         DispatchQueue.global().async {
-            //self.pwdCommand(tag: mifareTag)
-            self.miFareTagProcessAuth(tag: mifareTag)
+            self.pwdCommand(tag: mifareTag)
+            //self.miFareTagProcessAuth(tag: mifareTag)
         }
     }
     
