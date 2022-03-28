@@ -95,10 +95,10 @@ class CouponViewController: UITableViewController, NFCTagReaderSessionDelegate {
         }
     }
     
-    func writeCouponCode(from tag: NFCTag) {
-        guard case let .miFare(mifareTag) = tag else {
-            return
-        }
+    func writeCouponCode(from mifareTag: NFCMiFareTag) {
+//        guard case let .miFare(mifareTag) = tag else {
+//            return
+//        }
         
         DispatchQueue.global().async {
             
@@ -153,7 +153,133 @@ class CouponViewController: UITableViewController, NFCTagReaderSessionDelegate {
                 session.invalidate(errorMessage: "Connection error. Please try again.")
                 return
             }
-            self.writeCouponCode(from: tag!)
+            //self.writeCouponCode(from: tag!)
+            self.miFareTagProcessBlockPssw(tag: tag!)
+        }
+    }    
+    
+    func miFareTagProcessBlockPssw(tag: NFCTag){
+        
+        guard case let .miFare(mifareTag) = tag else {
+            return
+        }
+        DispatchQueue.global().async {
+            //self.pwdCommand(tag: mifareTag)
+            self.miFareTagProcessAuth(tag: mifareTag)
         }
     }
+    
+    func readTestCommand(tag: NFCMiFareTag){
+        let dataRead: [UInt8] = [0x30, 0x04] // Read E3 AUTH
+        let dataReadPacket = Data(dataRead)
+        
+        tag.sendMiFareCommand(commandPacket: dataReadPacket) { (result: Result<Data, Error>) in
+            switch result {
+            case .success(let response):
+                print("READ AUTH")
+            case .failure(let error):
+                self.readerSession?.invalidate(errorMessage: "ERROR READ AUTH")
+                return
+            }
+        }
+    }
+    
+    func miFareTagProcessAuth(tag: NFCMiFareTag){
+        
+        let dataAuth: [UInt8] = [0x1B, 0xFF, 0xFF, 0xFF, 0xFF] // PWD_AUTH 1B PSSW 0xFFFFFFFF
+        let dataAuthPacket = Data(dataAuth)
+        
+        tag.sendMiFareCommand(commandPacket: dataAuthPacket) { (result: Result<Data, Error>) in
+            switch result {
+            case .success(let response):
+                print("WRITE AUTH")
+                self.pwdCommand(tag: tag)
+            case .failure(let error):
+                self.readerSession?.invalidate(errorMessage: "ERROR AUTH PWD")
+                return
+            }
+        }
+    }
+    
+    func pwdCommand(tag: NFCMiFareTag){
+        let dataPwd: [UInt8] = [0xA2, 0x85, 0xFF, 0xFF, 0xFF, 0xFF] // Write 85 PSSW 0xFFFFFFFF
+        let dataPwdPacket = Data(dataPwd)
+        
+        tag.sendMiFareCommand(commandPacket: dataPwdPacket) { (result: Result<Data, Error>) in
+            switch result {
+            case .success(let response):
+                print("WRITE PWD")
+                self.packCommand(tag: tag)
+            case .failure(let error):
+                self.readerSession?.invalidate(errorMessage: "ERROR WRITE PWD")
+                return
+            }
+        }
+    }
+    
+    func packCommand(tag: NFCMiFareTag){
+        //Pack is the aknowledge code that NFC card return when user correctly authenticates
+        let dataPack: [UInt8] = [0xA2, 0x86, 0x01, 0x02, 0x00, 0x00] // Write 86 PACK 0x0102
+        let dataPackPacket = Data(dataPack)
+        
+        tag.sendMiFareCommand(commandPacket: dataPackPacket) { (result: Result<Data, Error>) in
+            switch result {
+            case .success(let response):
+                print("WRITE PACK")
+                self.authCommand(tag: tag)
+            case .failure(let error):
+                self.readerSession?.invalidate(errorMessage: "ERROR WRITE PACK")
+                return
+            }
+        }
+    }
+    
+    func protCommand(tag: NFCMiFareTag){
+        let dataProt: [UInt8] = [0x30, 0x84, 0x08, 0x00, 0x00, 0x00] // Write PROT to 1
+        let dataProtPacket = Data(dataProt)
+        
+        tag.sendMiFareCommand(commandPacket: dataProtPacket) { (result: Result<Data, Error>) in
+            switch result {
+            case .success(let response):
+                print("WRITE PROT")
+                self.authCommand(tag: tag)
+            case .failure(let error):
+                self.readerSession?.invalidate(errorMessage: "ERROR WRITE PROT")
+                return
+            }
+        }
+    }
+    
+    func authCommand(tag: NFCMiFareTag){
+        let dataRead: [UInt8] = [0x30, 0x83] // Read 83 to get AUTH0 conf
+        let dataReadPacket = Data(dataRead)
+        
+        tag.sendMiFareCommand(commandPacket: dataReadPacket) { (result: Result<Data, Error>) in
+            switch result {
+            case .success(let response):
+                print("READ AUTH0")
+                let dataByte : [UInt8] = [UInt8](response)
+                if dataByte.count > 2{
+                    let byte1 = dataByte[0], byte2 = dataByte[1], byte3 = dataByte[2]
+                    let dataAuth: [UInt8] = [0xA2, 0x83, byte1, byte2, byte3, 0x04] // Write 83 AUTH0 on loc on 0x04
+                    let dataAuthPacket = Data(dataAuth)
+                    tag.sendMiFareCommand(commandPacket: dataAuthPacket) { (result: Result<Data, Error>) in
+                        switch result {
+                        case .success(let response):
+                            print("WRITE AUTH0")
+                            self.writeCouponCode(from: tag)
+                        case .failure(let error):
+                            self.readerSession?.invalidate(errorMessage: "ERROR READ AUTH0")
+                            return
+                        }
+                    }
+                }
+            case .failure(let error):
+                self.readerSession?.invalidate(errorMessage: "ERROR READ AUTH0")
+                return
+            }
+        }
+                
+    }
+    
 }

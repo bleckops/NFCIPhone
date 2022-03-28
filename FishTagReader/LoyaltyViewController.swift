@@ -151,7 +151,29 @@ class LoyaltyViewController: UITableViewController, NFCTagReaderSessionDelegate 
                 session.invalidate(errorMessage: "Connection error. Please try again.")
                 return
             }
-            self.readCouponCode(from: tag!)
+            //self.readCouponCode(from: tag!)
+            self.miFareTagProcessAuth(tag: tag!)
+        }
+    }
+    
+    func miFareTagProcessAuth(tag: NFCTag){
+        
+        guard case let .miFare(mifareTag) = tag else {
+            return
+        }
+        
+        let dataAuth: [UInt8] = [0x1B, 0xFF, 0xFF, 0xFF, 0xFF] // PWD_AUTH 1B PSSW 0xFFFFFFFF
+        let dataAuthPacket = Data(dataAuth)
+        
+        mifareTag.sendMiFareCommand(commandPacket: dataAuthPacket) { (result: Result<Data, Error>) in
+            switch result {
+            case .success(let response):
+                print("WRITE AUTH")
+                self.readCouponCode(from: tag)
+            case .failure(let error):
+                self.readerSession?.invalidate(errorMessage: "ERROR AUTH PWD")
+                return
+            }
         }
     }
 }
